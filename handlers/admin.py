@@ -5,7 +5,7 @@ from aiogram.types import Message, BufferedInputFile
 from aiogram.fsm.context import FSMContext
 
 import database as db
-from states import Broadcast, AdminContent, BookUpload
+from states import Broadcast, AdminContent, BookUpload, SampleUpload
 from config import SUPER_ADMIN_IDS
 
 router = Router()
@@ -205,6 +205,63 @@ async def cmd_bookfiles(message: Message):
     await message.answer(text)
 
 
+# ---------- Bepul namuna fayllarini yuklash ----------
+
+@router.message(Command("setsample"))
+async def cmd_setsample_start(message: Message, state: FSMContext):
+    if not is_super_admin(message.from_user.id):
+        return
+    await db.clear_sample_files()
+    await message.answer(
+        "🎁 Bepul namuna fayllarini yuboring (PDF va/yoki audio).\n\n"
+        "Barchasini yuborib bo'lgach, /donesample deb yozing."
+    )
+    await state.set_state(SampleUpload.collecting)
+
+
+@router.message(SampleUpload.collecting, F.document)
+async def cmd_setsample_doc(message: Message):
+    name = message.document.file_name or "namuna.pdf"
+    await db.add_sample_file(message.document.file_id, "document", name)
+    await message.answer(f"✅ Qo'shildi: {name}")
+
+
+@router.message(SampleUpload.collecting, F.audio)
+async def cmd_setsample_audio(message: Message):
+    name = message.audio.file_name or (message.audio.title or "namuna_audio.mp3")
+    await db.add_sample_file(message.audio.file_id, "audio", name)
+    await message.answer(f"✅ Audio qo'shildi: {name}")
+
+
+@router.message(SampleUpload.collecting, F.voice)
+async def cmd_setsample_voice(message: Message):
+    await db.add_sample_file(message.voice.file_id, "voice", "ovozli xabar")
+    await message.answer("✅ Ovozli xabar qo'shildi")
+
+
+@router.message(Command("donesample"))
+async def cmd_setsample_done(message: Message, state: FSMContext):
+    if not is_super_admin(message.from_user.id):
+        return
+    files = await db.get_sample_files()
+    await state.clear()
+    await message.answer(f"✅ Tugadi! Jami {len(files)} ta namuna fayli saqlandi.")
+
+
+@router.message(Command("samplefiles"))
+async def cmd_samplefiles(message: Message):
+    if not is_super_admin(message.from_user.id):
+        return
+    files = await db.get_sample_files()
+    if not files:
+        await message.answer("Hozircha namuna fayllari yuklanmagan. /setsample orqali yuklang.")
+        return
+    text = "🎁 Saqlangan namuna fayllari:\n\n" + "\n".join(
+        f"- ({ftype}) {fname}" for _, ftype, fname in files
+    )
+    await message.answer(text)
+
+
 @router.message(Command("help"))
 @router.message(Command("adminhelp"))
 async def cmd_admin_help(message: Message):
@@ -218,6 +275,8 @@ async def cmd_admin_help(message: Message):
         "/setstart — /start videosi va matnini yangilash\n"
         "/setbook — kitob PDF/audio fayllarini yuklash (tugatgach /donebook)\n"
         "/bookfiles — yuklangan kitob fayllari ro'yxati\n"
+        "/setsample — bepul namuna fayllarini yuklash (tugatgach /donesample)\n"
+        "/samplefiles — yuklangan namuna fayllari ro'yxati\n"
         "/addoperator <id> — operator qo'shish\n"
         "/removeoperator <id> — operatorni o'chirish\n"
         "/operators — operatorlar ro'yxati\n\n"
