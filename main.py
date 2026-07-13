@@ -42,7 +42,10 @@ async def on_startup(app: web.Application):
 
 
 async def on_shutdown(app: web.Application):
-    await bot.delete_webhook()
+    # Diqqat: bu yerda bot.delete_webhook() chaqirilmaydi!
+    # Render bepul tarifida xizmat uxlab qolganda shu funksiya chaqiriladi;
+    # agar webhook shu yerda o'chirilsa, Telegram botga xabar yuborishni to'xtatadi
+    # va xizmat boshqa hech qachon o'zi uyg'onmaydi.
     await bot.session.close()
 
 
