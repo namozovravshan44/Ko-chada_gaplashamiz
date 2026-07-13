@@ -55,29 +55,49 @@ async def process_full_name(message: Message, state: FSMContext):
 
 
 @router.message(LeadForm.waiting_phone, F.content_type == ContentType.CONTACT)
-async def process_phone_contact(message: Message, state: FSMContext):
+async def process_phone_contact(message: Message, state: FSMContext, bot: Bot):
     data = await state.get_data()
     phone = message.contact.phone_number
     await db.save_lead(message.from_user.id, data.get("full_name", ""), phone)
-    await message.answer(
-        "Rahmat! Namunani tayyorlab yubordik. 📚\n\n"
-        "Kitobning to'liq versiyasini olish uchun pastdagi \"Sotib olish\" tugmasini bosing.",
-        reply_markup=kb.start_menu_kb(),
-    )
+    await send_sample_files(bot, message.from_user.id)
     await state.clear()
 
 
 @router.message(LeadForm.waiting_phone)
-async def process_phone_text(message: Message, state: FSMContext):
+async def process_phone_text(message: Message, state: FSMContext, bot: Bot):
     # Agar foydalanuvchi kontakt tugmasi o'rniga qo'lda raqam yozsa ham qabul qilamiz
     data = await state.get_data()
     await db.save_lead(message.from_user.id, data.get("full_name", ""), message.text)
-    await message.answer(
-        "Rahmat! Namunani tayyorlab yubordik. 📚\n\n"
+    await send_sample_files(bot, message.from_user.id)
+    await state.clear()
+
+
+async def send_sample_files(bot: Bot, user_id: int):
+    await bot.send_message(user_id, "Rahmat! Namunani tayyorlab yubordik. 📚👇")
+
+    sample_files = await db.get_sample_files()
+    if not sample_files:
+        await bot.send_message(
+            user_id,
+            "⚠️ Namuna fayllari hali tizimga yuklanmagan. Tez orada operator siz bilan bog'lanadi.",
+        )
+    else:
+        for file_id, file_type, file_name in sample_files:
+            try:
+                if file_type == "document":
+                    await bot.send_document(user_id, file_id, caption=file_name)
+                elif file_type == "audio":
+                    await bot.send_audio(user_id, file_id, caption=file_name)
+                elif file_type == "voice":
+                    await bot.send_voice(user_id, file_id)
+            except Exception:
+                pass
+
+    await bot.send_message(
+        user_id,
         "Kitobning to'liq versiyasini olish uchun pastdagi \"Sotib olish\" tugmasini bosing.",
         reply_markup=kb.start_menu_kb(),
     )
-    await state.clear()
 
 
 @router.callback_query(F.data == "buy_book")
