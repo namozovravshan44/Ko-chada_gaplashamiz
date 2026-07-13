@@ -20,6 +20,17 @@ CARD_NUMBER = os.getenv("CARD_NUMBER", "8600 0329 4328 2921")
 CARD_OWNER = os.getenv("CARD_OWNER", "Muhammadbobur Mahamadjonov")
 BOOK_PRICE = os.getenv("BOOK_PRICE", "130.000 so'm")
 
+BOOK_INFO_TEXT = os.getenv(
+    "BOOK_INFO_TEXT",
+    "📖 Kitobda 6 ta hayotiy mavzu, real suhbatlar, sifatli audio va rasmlar mavjud. "
+    "Zerikarli monolog va foydasiz mavzular yo'q — faqat kundalik hayotda kerak bo'ladigan amaliy nutq.",
+)
+
+MANAGER_CONTACT_TEXT = os.getenv(
+    "MANAGER_CONTACT_TEXT",
+    "Savolingiz bo'lsa shu yerga yozing, tez orada operatorlarimiz javob beradi ✍️",
+)
+
 # --- Webhook sozlamalari (Render kabi platformalar uchun) ---
 # Render bu o'zgaruvchini avtomatik beradi (https://sizning-servisingiz.onrender.com)
 # Agar boshqa platforma ishlatilsa, WEBHOOK_HOST'ni qo'lda .env orqali kiriting
@@ -29,3 +40,4 @@ WEBHOOK_URL = f"{WEBHOOK_HOST}{WEBHOOK_PATH}" if WEBHOOK_HOST else ""
 
 WEBAPP_HOST = "0.0.0.0"
 WEBAPP_PORT = int(os.getenv("PORT", 8080))
+
