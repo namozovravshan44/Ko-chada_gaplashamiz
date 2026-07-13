@@ -19,3 +19,13 @@ DB_PATH = os.getenv("DB_PATH", "bot_database.db")
 CARD_NUMBER = os.getenv("CARD_NUMBER", "8600 0329 4328 2921")
 CARD_OWNER = os.getenv("CARD_OWNER", "Muhammadbobur Mahamadjonov")
 BOOK_PRICE = os.getenv("BOOK_PRICE", "130.000 so'm")
+
+# --- Webhook sozlamalari (Render kabi platformalar uchun) ---
+# Render bu o'zgaruvchini avtomatik beradi (https://sizning-servisingiz.onrender.com)
+# Agar boshqa platforma ishlatilsa, WEBHOOK_HOST'ni qo'lda .env orqali kiriting
+WEBHOOK_HOST = os.getenv("RENDER_EXTERNAL_URL") or os.getenv("WEBHOOK_HOST", "")
+WEBHOOK_PATH = "/webhook"
+WEBHOOK_URL = f"{WEBHOOK_HOST}{WEBHOOK_PATH}" if WEBHOOK_HOST else ""
+
+WEBAPP_HOST = "0.0.0.0"
+WEBAPP_PORT = int(os.getenv("PORT", 8080))
