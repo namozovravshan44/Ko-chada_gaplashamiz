@@ -43,6 +43,13 @@ CREATE TABLE IF NOT EXISTS book_files (
     file_type TEXT,
     file_name TEXT
 );
+
+CREATE TABLE IF NOT EXISTS sample_files (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    file_id TEXT,
+    file_type TEXT,
+    file_name TEXT
+);
 """
 
 
@@ -164,6 +171,27 @@ async def add_book_file(file_id: str, file_type: str, file_name: str):
 async def get_book_files():
     async with aiosqlite.connect(DB_PATH) as db:
         cur = await db.execute("SELECT file_id, file_type, file_name FROM book_files ORDER BY id")
+        return await cur.fetchall()
+
+
+async def clear_sample_files():
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute("DELETE FROM sample_files")
+        await db.commit()
+
+
+async def add_sample_file(file_id: str, file_type: str, file_name: str):
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute(
+            "INSERT INTO sample_files (file_id, file_type, file_name) VALUES (?, ?, ?)",
+            (file_id, file_type, file_name),
+        )
+        await db.commit()
+
+
+async def get_sample_files():
+    async with aiosqlite.connect(DB_PATH) as db:
+        cur = await db.execute("SELECT file_id, file_type, file_name FROM sample_files ORDER BY id")
         return await cur.fetchall()
 
 
