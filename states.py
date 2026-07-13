@@ -20,3 +20,7 @@ class Broadcast(StatesGroup):
 
 class BookUpload(StatesGroup):
     collecting = State()
+
+
+class SampleUpload(StatesGroup):
+    collecting = State()
