@@ -6,7 +6,7 @@ from aiogram.fsm.context import FSMContext
 import database as db
 import keyboards as kb
 from states import LeadForm, ReceiptForm
-from config import CARD_NUMBER, CARD_OWNER, BOOK_PRICE, APPROVAL_CHAT_ID
+from config import CARD_NUMBER, CARD_OWNER, BOOK_PRICE, BOOK_INFO_TEXT, MANAGER_CONTACT_TEXT, APPROVAL_CHAT_ID
 
 router = Router()
 
@@ -121,18 +121,13 @@ async def ask_receipt(callback: CallbackQuery, state: FSMContext):
 
 @router.callback_query(F.data == "book_info")
 async def book_info(callback: CallbackQuery):
-    await callback.message.answer(
-        "📖 Kitobda 24 ta hayotiy mavzu, real suhbatlar, sifatli audio va rasmlar mavjud. "
-        "Zerikarli monolog va foydasiz mavzular yo'q — faqat kundalik hayotda kerak bo'ladigan amaliy nutq."
-    )
+    await callback.message.answer(BOOK_INFO_TEXT)
     await callback.answer()
 
 
 @router.callback_query(F.data == "contact_manager")
 async def contact_manager(callback: CallbackQuery):
-    await callback.message.answer(
-        "Savolingiz bo'lsa shu yerga yozing, tez orada operatorlarimiz javob beradi ✍️"
-    )
+    await callback.message.answer(MANAGER_CONTACT_TEXT)
     await callback.answer()
 
 
