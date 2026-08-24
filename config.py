@@ -18,11 +18,12 @@ DB_PATH = os.getenv("DB_PATH", "bot_database.db")
 
 CARD_NUMBER = os.getenv("CARD_NUMBER", "8600 0329 4328 2921")
 CARD_OWNER = os.getenv("CARD_OWNER", "Muhammadbobur Mahamadjonov")
-BOOK_PRICE = os.getenv("BOOK_PRICE", "130.000 so'm")
+BOOK_PRICE = os.getenv("BOOK_PRICE", "196 000 so'm")
+BOOK_DISCOUNT_PRICE = os.getenv("BOOK_DISCOUNT_PRICE", "57 000 so'm")
 
 BOOK_INFO_TEXT = os.getenv(
     "BOOK_INFO_TEXT",
-    "📖 Kitobda 6 ta hayotiy mavzu, real suhbatlar, sifatli audio va rasmlar mavjud. "
+    "📖 Kitobda 24 ta hayotiy mavzu, real suhbatlar, sifatli audio va rasmlar mavjud. "
     "Zerikarli monolog va foydasiz mavzular yo'q — faqat kundalik hayotda kerak bo'ladigan amaliy nutq.",
 )
 
@@ -41,3 +42,13 @@ WEBHOOK_URL = f"{WEBHOOK_HOST}{WEBHOOK_PATH}" if WEBHOOK_HOST else ""
 WEBAPP_HOST = "0.0.0.0"
 WEBAPP_PORT = int(os.getenv("PORT", 8080))
 
+# ── Botdan (kodga tegmasdan) o'zgartirish mumkin bo'lgan sozlamalar ──
+# key: (odam o'qiydigan nomi, boshlang'ich qiymat)
+SETTINGS_META = {
+    "book_price": ("Kitobning to'liq narxi", BOOK_PRICE),
+    "book_discount_price": ("Bugungi chegirmali narx", BOOK_DISCOUNT_PRICE),
+    "book_info_text": ("Kitob haqida ma'lumot matni", BOOK_INFO_TEXT),
+    "manager_contact_text": ("Operator bilan bog'lanish matni", MANAGER_CONTACT_TEXT),
+    "card_number": ("To'lov karta raqami", CARD_NUMBER),
+    "card_owner": ("Karta egasi ismi", CARD_OWNER),
+}
