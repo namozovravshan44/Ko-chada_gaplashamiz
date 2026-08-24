@@ -50,6 +50,21 @@ CREATE TABLE IF NOT EXISTS sample_files (
     file_type TEXT,
     file_name TEXT
 );
+
+CREATE TABLE IF NOT EXISTS ruspeak_files (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    file_id TEXT,
+    file_type TEXT,
+    file_name TEXT
+);
+
+CREATE TABLE IF NOT EXISTS ruspeak_leads (
+    token TEXT PRIMARY KEY,
+    user_id INTEGER,
+    username TEXT,
+    first_name TEXT,
+    linked_at TEXT
+);
 """
 
 
@@ -235,4 +250,48 @@ async def set_content(key: str, video_file_id: str, text: str):
 async def get_content(key: str):
     async with aiosqlite.connect(DB_PATH) as db:
         cur = await db.execute("SELECT video_file_id, text FROM bot_content WHERE key=?", (key,))
+        return await cur.fetchone()
+
+
+# ---------- Ruspeak (kurs) bonus fayllari ----------
+
+async def clear_ruspeak_files():
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute("DELETE FROM ruspeak_files")
+        await db.commit()
+
+
+async def add_ruspeak_file(file_id: str, file_type: str, file_name: str):
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute(
+            "INSERT INTO ruspeak_files (file_id, file_type, file_name) VALUES (?, ?, ?)",
+            (file_id, file_type, file_name),
+        )
+        await db.commit()
+
+
+async def get_ruspeak_files():
+    async with aiosqlite.connect(DB_PATH) as db:
+        cur = await db.execute("SELECT file_id, file_type, file_name FROM ruspeak_files ORDER BY id")
+        return await cur.fetchall()
+
+
+# ---------- Ruspeak lidlarini token orqali bog'lash ----------
+
+async def save_ruspeak_lead(token: str, user_id: int, username: str, first_name: str):
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute(
+            "INSERT INTO ruspeak_leads (token, user_id, username, first_name, linked_at) VALUES (?, ?, ?, ?, ?) "
+            "ON CONFLICT(token) DO UPDATE SET user_id=excluded.user_id, username=excluded.username, "
+            "first_name=excluded.first_name, linked_at=excluded.linked_at",
+            (token, user_id, username, first_name, datetime.utcnow().isoformat()),
+        )
+        await db.commit()
+
+
+async def get_ruspeak_lead(token: str):
+    async with aiosqlite.connect(DB_PATH) as db:
+        cur = await db.execute(
+            "SELECT token, user_id, username, first_name, linked_at FROM ruspeak_leads WHERE token=?", (token,)
+        )
         return await cur.fetchone()
