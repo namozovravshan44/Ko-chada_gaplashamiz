@@ -256,12 +256,13 @@ async def toggle_lang(callback: CallbackQuery):
 
 @router.callback_query(F.data == "buy_book")
 async def buy_book(callback: CallbackQuery):
+    import html as _html
     user_id = callback.from_user.id
     lang = await db.get_user_language(user_id)
-    price = await db.get_setting("book_price", BOOK_PRICE)
-    discount_price = await db.get_setting("book_discount_price", BOOK_DISCOUNT_PRICE)
-    card_number = await db.get_setting("card_number", CARD_NUMBER)
-    card_owner = await db.get_setting("card_owner", CARD_OWNER)
+    price = _html.escape(await db.get_setting("book_price", BOOK_PRICE))
+    discount_price = _html.escape(await db.get_setting("book_discount_price", BOOK_DISCOUNT_PRICE))
+    card_number = _html.escape(await db.get_setting("card_number", CARD_NUMBER))
+    card_owner = _html.escape(await db.get_setting("card_owner", CARD_OWNER))
 
     await db.mark_buy_clicked(user_id)  # 24/72 soatlik follow-up uchun vaqt belgilanadi
     variant = await db.get_or_assign_ab_variant(user_id)  # 10. A/B test
@@ -269,31 +270,32 @@ async def buy_book(callback: CallbackQuery):
     if lang == "ru":
         text = (
             f"Отлично!\n\n"
-            f"💰 Полная цена книги: {price}\n"
-            f"🔥 Но если купите именно сегодня — всего за {discount_price}!\n\n"
-            f"Шаг 1. Оплатите {discount_price} на карту 👇\n"
+            f"💰 Полная цена книги: <b>{price}</b>\n"
+            f"🔥 Но если купите именно сегодня — всего за <b>{discount_price}</b>!\n\n"
+            f"<b>Шаг 1.</b> Оплатите {discount_price} на карту 👇\n"
             f"{card_number}\n{card_owner}\n\n"
-            f"Шаг 2. Отправьте нам чек об оплате"
+            f"<b>Шаг 2.</b> Отправьте нам чек об оплате"
         )
     elif variant == "B":
         # B-variant: avval kitobning qiymatini, keyin narxni ta'kidlaydi (urg'u tartibi boshqacha)
         text = (
-            f"📖 24 ta hayotiy mavzu, real suhbatlar va sifatli audio — bularning barchasi endi sizniki bo'ladi!\n\n"
-            f"💰 To'liq narxi {price} bo'lsa-da, aynan bugun — bor-yo'g'i {discount_price}.\n\n"
-            f"1-qadam. Ushbu kartaga {discount_price} miqdorida to'lov qiling 👇\n"
+            f"🔥 <b>6 ta hayotiy mavzu, real suhbatlar va kundalik hayotda kerak bo'ladigan "
+            f"ruscha so'zlar va iboralar</b> — bularning barchasi endi sizniki bo'ladi!\n\n"
+            f"💰 To'liq narxi {price} bo'lsa-da, aynan bugun — bor-yo'g'i <b>{discount_price}</b>.\n\n"
+            f"<b>1-qadam.</b> Ushbu kartaga {discount_price} miqdorida to'lov qiling 👇\n"
             f"{card_number}\n{card_owner}\n\n"
-            f"2-qadam. To'lov chekini bizga yuboring"
+            f"<b>2-qadam.</b> To'lov chekini bizga yuboring"
         )
     else:
         text = (
             f"Ajoyib!\n\n"
-            f"💰 Kitobning to'liq narxi: {price}\n"
-            f"🔥 Ammo aynan bugun sotib olsangiz — bor-yo'g'i {discount_price}ga qo'lga kiritasiz!\n\n"
-            f"1-qadam. Ushbu kartaga {discount_price} miqdorida to'lov qiling 👇\n"
+            f"💰 Kitobning to'liq narxi: <b>{price}</b>\n"
+            f"🔥 Ammo aynan bugun sotib olsangiz — bor-yo'g'i <b>{discount_price}</b>ga qo'lga kiritasiz!\n\n"
+            f"<b>1-qadam.</b> Ushbu kartaga {discount_price} miqdorida to'lov qiling 👇\n"
             f"{card_number}\n{card_owner}\n\n"
-            f"2-qadam. To'lov chekini bizga yuboring"
+            f"<b>2-qadam.</b> To'lov chekini bizga yuboring"
         )
-    await callback.message.answer(text, reply_markup=kb.buy_menu_kb(lang))
+    await callback.message.answer(text, reply_markup=kb.buy_menu_kb(lang), parse_mode="HTML")
     await callback.answer()
 
 
