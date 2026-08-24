@@ -390,6 +390,56 @@ async def cmd_set(message: Message, command: CommandObject):
     await message.answer(f"✅ Yangilandi: {label}\n\nYangi qiymat: {value}")
 
 
+# ---------- Username'i yo'q mijozlar bilan ishlash ----------
+
+@router.message(Command("msg"))
+async def cmd_msg_user(message: Message, command: CommandObject, bot: Bot):
+    if not is_super_admin(message.from_user.id):
+        return
+    args = (command.args or "").strip()
+    if not args or " " not in args:
+        await message.answer("Foydalanish: /msg <user_id> <xabar matni>\n\nMasalan: /msg 999888777 Assalomu alaykum, sizga yordam bera olamanmi?")
+        return
+
+    user_id_str, text = args.split(" ", 1)
+    try:
+        user_id = int(user_id_str.strip())
+    except ValueError:
+        await message.answer("❌ user_id raqam bo'lishi kerak.")
+        return
+
+    try:
+        await bot.send_message(user_id, text.strip())
+        await message.answer("✅ Xabar yuborildi.")
+    except Exception as e:
+        await message.answer(f"❌ Yubora olmadim: {e}\n\n(Mijoz botni bloklagan yoki hali /start bosmagan bo'lishi mumkin)")
+
+
+@router.message(Command("lead"))
+async def cmd_lead_lookup(message: Message, command: CommandObject):
+    if not is_super_admin(message.from_user.id):
+        return
+    token = (command.args or "").strip()
+    if not token:
+        await message.answer("Foydalanish: /lead <token>\n\nMasalan: /lead Wmt49oy1uiekzcj")
+        return
+
+    lead = await db.get_ruspeak_lead(token)
+    if not lead:
+        await message.answer("❌ Bunday token bilan lid topilmadi.")
+        return
+
+    tok, user_id, username, first_name, linked_at = lead
+    await message.answer(
+        f"🔗 Token: {tok}\n"
+        f"👤 Ism: {first_name or '-'}\n"
+        f"📛 Username: @{username or 'yo\u2018q'}\n"
+        f"🆔 User ID: {user_id}\n"
+        f"🕓 Ulangan vaqt: {linked_at}\n\n"
+        f"Bog'lanish uchun: /msg {user_id} <xabar>"
+    )
+
+
 @router.message(Command("help"))
 @router.message(Command("adminhelp"))
 async def cmd_admin_help(message: Message):
@@ -409,6 +459,8 @@ async def cmd_admin_help(message: Message):
         "/ruspeakfiles — yuklangan Ruspeak bonus fayllari ro'yxati\n"
         "/settings — narx, matn va boshqa sozlamalar ro'yxati\n"
         "/set <key> <qiymat> — sozlamani o'zgartirish (masalan: /set book_discount_price 45 000 so'm)\n"
+        "/lead <token> — token orqali Ruspeak lidi ma'lumotini ko'rish\n"
+        "/msg <user_id> <xabar> — mijozga botdan to'g'ridan-to'g'ri xabar yuborish (username bo'lmasa ham ishlaydi)\n"
         "/addoperator <id> — operator qo'shish\n"
         "/removeoperator <id> — operatorni o'chirish\n"
         "/operators — operatorlar ro'yxati\n\n"
