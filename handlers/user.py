@@ -52,7 +52,7 @@ async def cmd_start_deeplink(message: Message, command: CommandObject, state: FS
             await bot.send_message(
                 APPROVAL_CHAT_ID,
                 f"📩 Yangi Ruspeak lidi botga ulandi!\n"
-                f"👤 {user.full_name} (@{user.username or 'username yo\u2018q'})\n"
+                f"👤 {user.full_name} (@{user.username or 'username yoq'})\n"
                 f"🆔 User ID: {user.id}\n"
                 f"🔗 Token: {payload}\n\n"
                 f"ℹ️ Username bo'lmasa ham, shu ID orqali bog'lanish mumkin:\n"
