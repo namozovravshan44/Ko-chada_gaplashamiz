@@ -433,7 +433,7 @@ async def cmd_lead_lookup(message: Message, command: CommandObject):
     await message.answer(
         f"🔗 Token: {tok}\n"
         f"👤 Ism: {first_name or '-'}\n"
-        f"📛 Username: @{username or 'yo\u2018q'}\n"
+        f"📛 Username: @{username or 'yoq'}\n"
         f"🆔 User ID: {user_id}\n"
         f"🕓 Ulangan vaqt: {linked_at}\n\n"
         f"Bog'lanish uchun: /msg {user_id} <xabar>"
