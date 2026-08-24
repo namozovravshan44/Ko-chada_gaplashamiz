@@ -15,6 +15,7 @@ from config import (
 )
 from database import init_db
 from handlers import admin, operator, user
+from scheduler import run_scheduler
 
 logging.basicConfig(level=logging.INFO)
 
@@ -29,8 +30,11 @@ dp.include_router(admin.router)
 dp.include_router(operator.router)
 dp.include_router(user.router)
 
+_scheduler_task = None
+
 
 async def on_startup(app: web.Application):
+    global _scheduler_task
     await init_db()
     if WEBHOOK_URL:
         await bot.set_webhook(WEBHOOK_URL, drop_pending_updates=True)
@@ -39,9 +43,13 @@ async def on_startup(app: web.Application):
         logging.warning(
             "⚠️ WEBHOOK_HOST topilmadi! Webhook o'rnatilmadi — bot xabarlarni qabul qilmaydi."
         )
+    _scheduler_task = asyncio.create_task(run_scheduler(bot))
 
 
 async def on_shutdown(app: web.Application):
+    global _scheduler_task
+    if _scheduler_task:
+        _scheduler_task.cancel()
     # Diqqat: bu yerda bot.delete_webhook() chaqirilmaydi!
     # Render bepul tarifida xizmat uxlab qolganda shu funksiya chaqiriladi;
     # agar webhook shu yerda o'chirilsa, Telegram botga xabar yuborishni to'xtatadi
