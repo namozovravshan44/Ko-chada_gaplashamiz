@@ -1,7 +1,7 @@
 import aiosqlite
 import csv
 import io
-from datetime import datetime
+from datetime import datetime, timedelta
 from config import DB_PATH
 
 SCHEMA = """
@@ -13,7 +13,15 @@ CREATE TABLE IF NOT EXISTS users (
     phone TEXT,
     started_at TEXT,
     lead_captured INTEGER DEFAULT 0,
-    purchased INTEGER DEFAULT 0
+    purchased INTEGER DEFAULT 0,
+    language TEXT DEFAULT 'uz',
+    referred_by INTEGER,
+    buy_clicked_at TEXT,
+    reminder_24h_sent INTEGER DEFAULT 0,
+    discount_offer_sent INTEGER DEFAULT 0,
+    purchased_at TEXT,
+    review_requested INTEGER DEFAULT 0,
+    ab_variant TEXT
 );
 
 CREATE TABLE IF NOT EXISTS operators (
@@ -78,6 +86,24 @@ async def init_db():
         await db.executescript(SCHEMA)
         await db.commit()
 
+        # Mavjud (eski) bazalarda quyidagi ustunlar bo'lmasligi mumkin — xavfsiz qo'shamiz
+        migrations = [
+            "ALTER TABLE users ADD COLUMN language TEXT DEFAULT 'uz'",
+            "ALTER TABLE users ADD COLUMN referred_by INTEGER",
+            "ALTER TABLE users ADD COLUMN buy_clicked_at TEXT",
+            "ALTER TABLE users ADD COLUMN reminder_24h_sent INTEGER DEFAULT 0",
+            "ALTER TABLE users ADD COLUMN discount_offer_sent INTEGER DEFAULT 0",
+            "ALTER TABLE users ADD COLUMN purchased_at TEXT",
+            "ALTER TABLE users ADD COLUMN review_requested INTEGER DEFAULT 0",
+            "ALTER TABLE users ADD COLUMN ab_variant TEXT",
+        ]
+        for sql in migrations:
+            try:
+                await db.execute(sql)
+                await db.commit()
+            except Exception:
+                pass  # ustun allaqachon mavjud
+
 
 async def upsert_user(user_id: int, username: str, first_name: str):
     async with aiosqlite.connect(DB_PATH) as db:
@@ -140,6 +166,20 @@ async def get_all_user_ids():
         return [r[0] for r in rows]
 
 
+async def get_not_purchased_user_ids():
+    async with aiosqlite.connect(DB_PATH) as db:
+        cur = await db.execute("SELECT user_id FROM users WHERE purchased=0")
+        rows = await cur.fetchall()
+        return [r[0] for r in rows]
+
+
+async def get_ruspeak_lead_user_ids():
+    async with aiosqlite.connect(DB_PATH) as db:
+        cur = await db.execute("SELECT DISTINCT user_id FROM ruspeak_leads WHERE user_id IS NOT NULL")
+        rows = await cur.fetchall()
+        return [r[0] for r in rows]
+
+
 async def get_stats():
     async with aiosqlite.connect(DB_PATH) as db:
         total = (await (await db.execute("SELECT COUNT(*) FROM users")).fetchone())[0]
@@ -148,11 +188,39 @@ async def get_stats():
         pending_receipts = (
             await (await db.execute("SELECT COUNT(*) FROM receipts WHERE status='pending'")).fetchone()
         )[0]
+
+        now = datetime.utcnow()
+        today_start = now.strftime("%Y-%m-%d")
+        week_start = (now - timedelta(days=7)).isoformat()
+        month_start = (now - timedelta(days=30)).isoformat()
+
+        today_count = (
+            await (await db.execute(
+                "SELECT COUNT(*) FROM users WHERE started_at LIKE ?", (today_start + "%",)
+            )).fetchone()
+        )[0]
+        week_count = (
+            await (await db.execute(
+                "SELECT COUNT(*) FROM users WHERE started_at >= ?", (week_start,)
+            )).fetchone()
+        )[0]
+        month_count = (
+            await (await db.execute(
+                "SELECT COUNT(*) FROM users WHERE started_at >= ?", (month_start,)
+            )).fetchone()
+        )[0]
+
+        conversion = round((purchased / total * 100), 1) if total else 0.0
+
         return {
             "total": total,
             "leads": leads,
             "purchased": purchased,
             "pending_receipts": pending_receipts,
+            "today": today_count,
+            "week": week_count,
+            "month": month_count,
+            "conversion": conversion,
         }
 
 
@@ -326,3 +394,196 @@ async def get_all_settings() -> dict:
         cur = await db.execute("SELECT key, value FROM settings")
         rows = await cur.fetchall()
         return {k: v for k, v in rows}
+
+
+# ---------- Foydalanuvchi tili (uz/ru) ----------
+
+async def get_user_language(user_id: int) -> str:
+    async with aiosqlite.connect(DB_PATH) as db:
+        cur = await db.execute("SELECT language FROM users WHERE user_id=?", (user_id,))
+        row = await cur.fetchone()
+        return (row[0] if row and row[0] else "uz")
+
+
+async def set_user_language(user_id: int, lang: str):
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute("UPDATE users SET language=? WHERE user_id=?", (lang, user_id))
+        await db.commit()
+
+
+# ---------- Xavfsizlik: shubhali faollikni kuzatish ----------
+# (soddalik uchun xotirada saqlanadi — bot qayta ishga tushsa tozalanadi, bu yetarli)
+_start_activity: dict[int, list[float]] = {}
+
+def check_suspicious_start(user_id: int, window_seconds: int = 60, max_starts: int = 5) -> bool:
+    """True qaytarsa — shu foydalanuvchi shubhali darajada tez-tez /start bosayapti."""
+    import time
+    now = time.time()
+    history = _start_activity.setdefault(user_id, [])
+    history.append(now)
+    # eskirgan yozuvlarni tozalaymiz
+    _start_activity[user_id] = [t for t in history if now - t <= window_seconds]
+    return len(_start_activity[user_id]) >= max_starts
+
+
+# ---------- 4. Referal tizimi ----------
+
+async def set_referrer(user_id: int, referrer_id: int):
+    async with aiosqlite.connect(DB_PATH) as db:
+        # Faqat hali referred_by bo'sh bo'lsa yozamiz (o'zini o'zi taklif qilmasligi va qayta yozilmasligi uchun)
+        await db.execute(
+            "UPDATE users SET referred_by=? WHERE user_id=? AND referred_by IS NULL AND user_id != ?",
+            (referrer_id, user_id, referrer_id),
+        )
+        await db.commit()
+
+
+async def get_referral_count(referrer_id: int) -> int:
+    async with aiosqlite.connect(DB_PATH) as db:
+        cur = await db.execute("SELECT COUNT(*) FROM users WHERE referred_by=?", (referrer_id,))
+        return (await cur.fetchone())[0]
+
+
+async def get_referrer(user_id: int):
+    async with aiosqlite.connect(DB_PATH) as db:
+        cur = await db.execute("SELECT referred_by FROM users WHERE user_id=?", (user_id,))
+        row = await cur.fetchone()
+        return row[0] if row else None
+
+
+async def get_referral_purchased_count(referrer_id: int) -> int:
+    async with aiosqlite.connect(DB_PATH) as db:
+        cur = await db.execute(
+            "SELECT COUNT(*) FROM users WHERE referred_by=? AND purchased=1", (referrer_id,)
+        )
+        return (await cur.fetchone())[0]
+
+
+# ---------- 3 & 13. Sotib olishni bosib, tugatmaganlar (follow-up / chegirma) ----------
+
+async def mark_buy_clicked(user_id: int):
+    async with aiosqlite.connect(DB_PATH) as db:
+        cur = await db.execute("SELECT buy_clicked_at FROM users WHERE user_id=?", (user_id,))
+        row = await cur.fetchone()
+        if row and not row[0]:  # faqat birinchi marta yozamiz
+            await db.execute(
+                "UPDATE users SET buy_clicked_at=? WHERE user_id=?",
+                (datetime.utcnow().isoformat(), user_id),
+            )
+            await db.commit()
+
+
+async def get_users_needing_24h_reminder():
+    threshold = (datetime.utcnow() - timedelta(hours=24)).isoformat()
+    async with aiosqlite.connect(DB_PATH) as db:
+        cur = await db.execute(
+            "SELECT user_id FROM users WHERE buy_clicked_at IS NOT NULL AND buy_clicked_at <= ? "
+            "AND purchased=0 AND reminder_24h_sent=0",
+            (threshold,),
+        )
+        return [r[0] for r in await cur.fetchall()]
+
+
+async def mark_reminder_sent(user_id: int):
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute("UPDATE users SET reminder_24h_sent=1 WHERE user_id=?", (user_id,))
+        await db.commit()
+
+
+async def get_users_needing_discount_offer():
+    threshold = (datetime.utcnow() - timedelta(hours=72)).isoformat()
+    async with aiosqlite.connect(DB_PATH) as db:
+        cur = await db.execute(
+            "SELECT user_id FROM users WHERE buy_clicked_at IS NOT NULL AND buy_clicked_at <= ? "
+            "AND purchased=0 AND discount_offer_sent=0",
+            (threshold,),
+        )
+        return [r[0] for r in await cur.fetchall()]
+
+
+async def mark_discount_offer_sent(user_id: int):
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute("UPDATE users SET discount_offer_sent=1 WHERE user_id=?", (user_id,))
+        await db.commit()
+
+
+# ---------- 12. Xarid qilgandan keyin sharh so'rash ----------
+
+async def mark_purchased_at(user_id: int):
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute(
+            "UPDATE users SET purchased_at=? WHERE user_id=?", (datetime.utcnow().isoformat(), user_id)
+        )
+        await db.commit()
+
+
+async def get_users_needing_review_request():
+    threshold = (datetime.utcnow() - timedelta(days=3)).isoformat()
+    async with aiosqlite.connect(DB_PATH) as db:
+        cur = await db.execute(
+            "SELECT user_id FROM users WHERE purchased_at IS NOT NULL AND purchased_at <= ? "
+            "AND review_requested=0",
+            (threshold,),
+        )
+        return [r[0] for r in await cur.fetchall()]
+
+
+async def mark_review_requested(user_id: int):
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute("UPDATE users SET review_requested=1 WHERE user_id=?", (user_id,))
+        await db.commit()
+
+
+# ---------- 10. A/B test ----------
+
+async def get_or_assign_ab_variant(user_id: int) -> str:
+    import random
+    async with aiosqlite.connect(DB_PATH) as db:
+        cur = await db.execute("SELECT ab_variant FROM users WHERE user_id=?", (user_id,))
+        row = await cur.fetchone()
+        if row and row[0]:
+            return row[0]
+        variant = random.choice(["A", "B"])
+        if row is None:
+            # Foydalanuvchi hali users jadvalida yo'q (odatiy holatda bo'lmasligi kerak,
+            # lekin xavfsizlik uchun) — minimal yozuv yaratamiz
+            await db.execute(
+                "INSERT INTO users (user_id, started_at, ab_variant) VALUES (?, ?, ?)",
+                (user_id, datetime.utcnow().isoformat(), variant),
+            )
+        else:
+            await db.execute("UPDATE users SET ab_variant=? WHERE user_id=?", (variant, user_id))
+        await db.commit()
+        return variant
+
+
+async def get_ab_test_stats():
+    async with aiosqlite.connect(DB_PATH) as db:
+        result = {}
+        for variant in ("A", "B"):
+            total = (
+                await (await db.execute(
+                    "SELECT COUNT(*) FROM users WHERE ab_variant=?", (variant,)
+                )).fetchone()
+            )[0]
+            purchased = (
+                await (await db.execute(
+                    "SELECT COUNT(*) FROM users WHERE ab_variant=? AND purchased=1", (variant,)
+                )).fetchone()
+            )[0]
+            result[variant] = {
+                "total": total,
+                "purchased": purchased,
+                "conversion": round(purchased / total * 100, 1) if total else 0.0,
+            }
+        return result
+
+
+# ---------- 5. Kunlik avtomatik hisobot ----------
+
+async def get_last_report_date() -> str:
+    return await get_setting("last_daily_report_date", "")
+
+
+async def set_last_report_date(date_str: str):
+    await set_setting("last_daily_report_date", date_str)
