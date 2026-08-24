@@ -6,7 +6,7 @@ from aiogram.fsm.context import FSMContext
 
 import database as db
 from states import Broadcast, AdminContent, BookUpload, SampleUpload, RuspeakUpload
-from config import SUPER_ADMIN_IDS
+from config import SUPER_ADMIN_IDS, SETTINGS_META
 
 router = Router()
 
@@ -270,7 +270,7 @@ async def cmd_setruspeak_start(message: Message, state: FSMContext):
         return
     await db.clear_ruspeak_files()
     await message.answer(
-        "🎵 Ruspeak bonus dars fayllarini yuboring (audio, video yoki PDF).\n\n"
+        "🎵 Ruspeak bonus dars fayllarini yuboring (audio, video, rasm, PDF yoki oddiy matn).\n\n"
         "Bular Ruspeak saytidan ro'yxatdan o'tib botga kirgan mijozlarga /start bosishi bilanoq "
         "avtomatik yuboriladi.\n\n"
         "Barchasini yuborib bo'lgach, /doneruspeak deb yozing."
@@ -305,6 +305,20 @@ async def cmd_setruspeak_video(message: Message):
     await message.answer(f"✅ Video qo'shildi: {name}")
 
 
+@router.message(RuspeakUpload.collecting, F.photo)
+async def cmd_setruspeak_photo(message: Message):
+    photo = message.photo[-1]  # eng katta o'lchamdagi versiyasi
+    caption = message.caption or ""
+    await db.add_ruspeak_file(photo.file_id, "photo", caption)
+    await message.answer("✅ Rasm qo'shildi" + (f" (izoh bilan)" if caption else ""))
+
+
+@router.message(RuspeakUpload.collecting, F.text & ~F.text.startswith("/"))
+async def cmd_setruspeak_text(message: Message):
+    await db.add_ruspeak_file(message.text, "text", "")
+    await message.answer("✅ Matn qo'shildi")
+
+
 @router.message(Command("doneruspeak"))
 async def cmd_setruspeak_done(message: Message, state: FSMContext):
     if not is_super_admin(message.from_user.id):
@@ -328,6 +342,54 @@ async def cmd_ruspeakfiles(message: Message):
     await message.answer(text)
 
 
+# ---------- Umumiy sozlamalar: narx, matnlar, karta va h.k. ----------
+
+@router.message(Command("settings"))
+async def cmd_settings(message: Message):
+    if not is_super_admin(message.from_user.id):
+        return
+    saved = await db.get_all_settings()
+    lines = ["⚙️ Botdagi o'zgartirish mumkin bo'lgan sozlamalar:\n"]
+    for key, (label, default) in SETTINGS_META.items():
+        current = saved.get(key, default)
+        lines.append(f"🔑 `{key}` — {label}\n   Hozirgi qiymat: {current}\n")
+    lines.append(
+        "\nO'zgartirish uchun:\n"
+        "/set <key> <yangi qiymat>\n\n"
+        "Masalan:\n"
+        "/set book_discount_price 45 000 so'm"
+    )
+    await message.answer("\n".join(lines), parse_mode="Markdown")
+
+
+@router.message(Command("set"))
+async def cmd_set(message: Message, command: CommandObject):
+    if not is_super_admin(message.from_user.id):
+        return
+    args = (command.args or "").strip()
+    if not args or " " not in args:
+        await message.answer(
+            "Foydalanish: /set <key> <yangi qiymat>\n"
+            "Mavjud kalitlarni ko'rish uchun /settings yozing."
+        )
+        return
+
+    key, value = args.split(" ", 1)
+    key = key.strip()
+    value = value.strip()
+
+    if key not in SETTINGS_META:
+        await message.answer(
+            f"❌ Noma'lum kalit: `{key}`\n\nMavjud kalitlarni ko'rish uchun /settings yozing.",
+            parse_mode="Markdown",
+        )
+        return
+
+    await db.set_setting(key, value)
+    label = SETTINGS_META[key][0]
+    await message.answer(f"✅ Yangilandi: {label}\n\nYangi qiymat: {value}")
+
+
 @router.message(Command("help"))
 @router.message(Command("adminhelp"))
 async def cmd_admin_help(message: Message):
@@ -345,6 +407,8 @@ async def cmd_admin_help(message: Message):
         "/samplefiles — yuklangan namuna fayllari ro'yxati\n"
         "/setruspeak — Ruspeak bonus dars fayllarini yuklash (tugatgach /doneruspeak)\n"
         "/ruspeakfiles — yuklangan Ruspeak bonus fayllari ro'yxati\n"
+        "/settings — narx, matn va boshqa sozlamalar ro'yxati\n"
+        "/set <key> <qiymat> — sozlamani o'zgartirish (masalan: /set book_discount_price 45 000 so'm)\n"
         "/addoperator <id> — operator qo'shish\n"
         "/removeoperator <id> — operatorni o'chirish\n"
         "/operators — operatorlar ro'yxati\n\n"
