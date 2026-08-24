@@ -65,6 +65,11 @@ CREATE TABLE IF NOT EXISTS ruspeak_leads (
     first_name TEXT,
     linked_at TEXT
 );
+
+CREATE TABLE IF NOT EXISTS settings (
+    key TEXT PRIMARY KEY,
+    value TEXT
+);
 """
 
 
@@ -295,3 +300,29 @@ async def get_ruspeak_lead(token: str):
             "SELECT token, user_id, username, first_name, linked_at FROM ruspeak_leads WHERE token=?", (token,)
         )
         return await cur.fetchone()
+
+
+# ---------- Umumiy sozlamalar (narx, matnlar va h.k. — botdan o'zgartiriladi) ----------
+
+async def get_setting(key: str, default: str = "") -> str:
+    async with aiosqlite.connect(DB_PATH) as db:
+        cur = await db.execute("SELECT value FROM settings WHERE key=?", (key,))
+        row = await cur.fetchone()
+        return row[0] if row else default
+
+
+async def set_setting(key: str, value: str):
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute(
+            "INSERT INTO settings (key, value) VALUES (?, ?) "
+            "ON CONFLICT(key) DO UPDATE SET value=excluded.value",
+            (key, value),
+        )
+        await db.commit()
+
+
+async def get_all_settings() -> dict:
+    async with aiosqlite.connect(DB_PATH) as db:
+        cur = await db.execute("SELECT key, value FROM settings")
+        rows = await cur.fetchall()
+        return {k: v for k, v in rows}
