@@ -5,7 +5,7 @@ from aiogram.types import Message, BufferedInputFile
 from aiogram.fsm.context import FSMContext
 
 import database as db
-from states import Broadcast, AdminContent, BookUpload, SampleUpload
+from states import Broadcast, AdminContent, BookUpload, SampleUpload, RuspeakUpload
 from config import SUPER_ADMIN_IDS
 
 router = Router()
@@ -262,6 +262,72 @@ async def cmd_samplefiles(message: Message):
     await message.answer(text)
 
 
+# ---------- Ruspeak bonus fayllarini yuklash ----------
+
+@router.message(Command("setruspeak"))
+async def cmd_setruspeak_start(message: Message, state: FSMContext):
+    if not is_super_admin(message.from_user.id):
+        return
+    await db.clear_ruspeak_files()
+    await message.answer(
+        "🎵 Ruspeak bonus dars fayllarini yuboring (audio, video yoki PDF).\n\n"
+        "Bular Ruspeak saytidan ro'yxatdan o'tib botga kirgan mijozlarga /start bosishi bilanoq "
+        "avtomatik yuboriladi.\n\n"
+        "Barchasini yuborib bo'lgach, /doneruspeak deb yozing."
+    )
+    await state.set_state(RuspeakUpload.collecting)
+
+
+@router.message(RuspeakUpload.collecting, F.document)
+async def cmd_setruspeak_doc(message: Message):
+    name = message.document.file_name or "ruspeak_dars.pdf"
+    await db.add_ruspeak_file(message.document.file_id, "document", name)
+    await message.answer(f"✅ Qo'shildi: {name}")
+
+
+@router.message(RuspeakUpload.collecting, F.audio)
+async def cmd_setruspeak_audio(message: Message):
+    name = message.audio.file_name or (message.audio.title or "ruspeak_dars.mp3")
+    await db.add_ruspeak_file(message.audio.file_id, "audio", name)
+    await message.answer(f"✅ Audio qo'shildi: {name}")
+
+
+@router.message(RuspeakUpload.collecting, F.voice)
+async def cmd_setruspeak_voice(message: Message):
+    await db.add_ruspeak_file(message.voice.file_id, "voice", "ovozli xabar")
+    await message.answer("✅ Ovozli xabar qo'shildi")
+
+
+@router.message(RuspeakUpload.collecting, F.video)
+async def cmd_setruspeak_video(message: Message):
+    name = "ruspeak_dars.mp4"
+    await db.add_ruspeak_file(message.video.file_id, "video", name)
+    await message.answer(f"✅ Video qo'shildi: {name}")
+
+
+@router.message(Command("doneruspeak"))
+async def cmd_setruspeak_done(message: Message, state: FSMContext):
+    if not is_super_admin(message.from_user.id):
+        return
+    files = await db.get_ruspeak_files()
+    await state.clear()
+    await message.answer(f"✅ Tugadi! Jami {len(files)} ta Ruspeak bonus fayli saqlandi.")
+
+
+@router.message(Command("ruspeakfiles"))
+async def cmd_ruspeakfiles(message: Message):
+    if not is_super_admin(message.from_user.id):
+        return
+    files = await db.get_ruspeak_files()
+    if not files:
+        await message.answer("Hozircha Ruspeak bonus fayllari yuklanmagan. /setruspeak orqali yuklang.")
+        return
+    text = "🎵 Saqlangan Ruspeak bonus fayllari:\n\n" + "\n".join(
+        f"- ({ftype}) {fname}" for _, ftype, fname in files
+    )
+    await message.answer(text)
+
+
 @router.message(Command("help"))
 @router.message(Command("adminhelp"))
 async def cmd_admin_help(message: Message):
@@ -277,6 +343,8 @@ async def cmd_admin_help(message: Message):
         "/bookfiles — yuklangan kitob fayllari ro'yxati\n"
         "/setsample — bepul namuna fayllarini yuklash (tugatgach /donesample)\n"
         "/samplefiles — yuklangan namuna fayllari ro'yxati\n"
+        "/setruspeak — Ruspeak bonus dars fayllarini yuklash (tugatgach /doneruspeak)\n"
+        "/ruspeakfiles — yuklangan Ruspeak bonus fayllari ro'yxati\n"
         "/addoperator <id> — operator qo'shish\n"
         "/removeoperator <id> — operatorni o'chirish\n"
         "/operators — operatorlar ro'yxati\n\n"
