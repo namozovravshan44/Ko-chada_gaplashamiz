@@ -1,5 +1,5 @@
 from aiogram import Router, F, Bot
-from aiogram.filters import CommandStart
+from aiogram.filters import CommandStart, CommandObject
 from aiogram.types import Message, CallbackQuery, ContentType
 from aiogram.fsm.context import FSMContext
 
@@ -16,6 +16,69 @@ DEFAULT_START_TEXT = (
     "o'rganish uchun yaratilgan kitob.\n\n"
     "Bepul namuna olish yoki hoziroq sotib olish uchun quyidagi tugmalardan birini tanlang 👇"
 )
+
+RUSPEAK_WELCOME_TEXT = (
+    "Assalomu alaykum! 👋\n\n"
+    "Ruspeak saytida ro'yxatdan o'tganingiz uchun rahmat! 🎉\n"
+    "Bonus sifatida \"Musiqa bilan rus tilini o'rganish\" darsini hoziroq yuboramiz 👇"
+)
+
+
+def _is_ruspeak_token(payload: str) -> bool:
+    # Ruspeak lending sahifasi generatsiya qiladigan token har doim "W" bilan boshlanadi
+    # (masalan: Wmt49oy1uiekzcj) — kitob boti uchun boshqa deep-link'lar bilan aralashmasin
+    return bool(payload) and payload.startswith("W") and len(payload) > 5
+
+
+@router.message(CommandStart(deep_link=True))
+async def cmd_start_deeplink(message: Message, command: CommandObject, state: FSMContext, bot: Bot):
+    await state.clear()
+    payload = (command.args or "").strip()
+
+    if not _is_ruspeak_token(payload):
+        # Tanish bo'lmagan/eski formatdagi deep-link — oddiy /start sifatida davom etamiz
+        await cmd_start(message, state)
+        return
+
+    user = message.from_user
+    await db.upsert_user(user.id, user.username, user.first_name)
+    await db.save_ruspeak_lead(payload, user.id, user.username or "", user.first_name or "")
+
+    await message.answer(RUSPEAK_WELCOME_TEXT)
+    await send_ruspeak_files(bot, user.id)
+
+    if APPROVAL_CHAT_ID:
+        try:
+            await bot.send_message(
+                APPROVAL_CHAT_ID,
+                f"📩 Yangi Ruspeak lidi botga ulandi!\n"
+                f"👤 {user.full_name} (@{user.username or '-'})\n"
+                f"🔗 Token: {payload}",
+            )
+        except Exception:
+            pass
+
+
+async def send_ruspeak_files(bot: Bot, user_id: int):
+    files = await db.get_ruspeak_files()
+    if not files:
+        await bot.send_message(
+            user_id,
+            "⚠️ Bonus dars fayli hali tizimga yuklanmagan. Tez orada operator siz bilan bog'lanadi.",
+        )
+        return
+    for file_id, file_type, file_name in files:
+        try:
+            if file_type == "document":
+                await bot.send_document(user_id, file_id, caption=file_name)
+            elif file_type == "audio":
+                await bot.send_audio(user_id, file_id, caption=file_name)
+            elif file_type == "voice":
+                await bot.send_voice(user_id, file_id)
+            elif file_type == "video":
+                await bot.send_video(user_id, file_id, caption=file_name)
+        except Exception:
+            pass
 
 
 @router.message(CommandStart())
