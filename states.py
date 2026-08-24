@@ -28,3 +28,11 @@ class SampleUpload(StatesGroup):
 
 class RuspeakUpload(StatesGroup):
     collecting = State()
+
+
+class SettingEdit(StatesGroup):
+    waiting_value = State()
+
+
+class BroadcastPanel(StatesGroup):
+    waiting_message = State()
