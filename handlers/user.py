@@ -6,7 +6,7 @@ from aiogram.fsm.context import FSMContext
 import database as db
 import keyboards as kb
 from states import LeadForm, ReceiptForm
-from config import CARD_NUMBER, CARD_OWNER, BOOK_PRICE, BOOK_INFO_TEXT, MANAGER_CONTACT_TEXT, APPROVAL_CHAT_ID
+from config import CARD_NUMBER, CARD_OWNER, BOOK_PRICE, BOOK_DISCOUNT_PRICE, BOOK_INFO_TEXT, MANAGER_CONTACT_TEXT, APPROVAL_CHAT_ID
 
 router = Router()
 
@@ -77,6 +77,10 @@ async def send_ruspeak_files(bot: Bot, user_id: int):
                 await bot.send_voice(user_id, file_id)
             elif file_type == "video":
                 await bot.send_video(user_id, file_id, caption=file_name)
+            elif file_type == "photo":
+                await bot.send_photo(user_id, file_id, caption=file_name or None)
+            elif file_type == "text":
+                await bot.send_message(user_id, file_id)  # matn kontenti file_id ustunida saqlanadi
         except Exception:
             pass
 
@@ -165,10 +169,16 @@ async def send_sample_files(bot: Bot, user_id: int):
 
 @router.callback_query(F.data == "buy_book")
 async def buy_book(callback: CallbackQuery):
+    price = await db.get_setting("book_price", BOOK_PRICE)
+    discount_price = await db.get_setting("book_discount_price", BOOK_DISCOUNT_PRICE)
+    card_number = await db.get_setting("card_number", CARD_NUMBER)
+    card_owner = await db.get_setting("card_owner", CARD_OWNER)
     text = (
         f"Ajoyib!\n\n"
-        f"1-qadam. Ushbu kartaga {BOOK_PRICE} miqdorida to'lov qiling 👇\n"
-        f"{CARD_NUMBER}\n{CARD_OWNER}\n\n"
+        f"💰 Kitobning to'liq narxi: {price}\n"
+        f"🔥 Ammo aynan bugun sotib olsangiz — bor-yo'g'i {discount_price}ga qo'lga kiritasiz!\n\n"
+        f"1-qadam. Ushbu kartaga {discount_price} miqdorida to'lov qiling 👇\n"
+        f"{card_number}\n{card_owner}\n\n"
         f"2-qadam. To'lov chekini bizga yuboring"
     )
     await callback.message.answer(text, reply_markup=kb.buy_menu_kb())
@@ -184,13 +194,15 @@ async def ask_receipt(callback: CallbackQuery, state: FSMContext):
 
 @router.callback_query(F.data == "book_info")
 async def book_info(callback: CallbackQuery):
-    await callback.message.answer(BOOK_INFO_TEXT)
+    text = await db.get_setting("book_info_text", BOOK_INFO_TEXT)
+    await callback.message.answer(text)
     await callback.answer()
 
 
 @router.callback_query(F.data == "contact_manager")
 async def contact_manager(callback: CallbackQuery):
-    await callback.message.answer(MANAGER_CONTACT_TEXT)
+    text = await db.get_setting("manager_contact_text", MANAGER_CONTACT_TEXT)
+    await callback.message.answer(text)
     await callback.answer()
 
 
