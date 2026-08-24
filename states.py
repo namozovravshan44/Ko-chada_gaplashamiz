@@ -24,3 +24,7 @@ class BookUpload(StatesGroup):
 
 class SampleUpload(StatesGroup):
     collecting = State()
+
+
+class RuspeakUpload(StatesGroup):
+    collecting = State()
