@@ -14,6 +14,9 @@ SUPER_ADMIN_IDS = [
 # (o'zingizning shaxsiy ID'ingizni ham shu yerga qo'yishingiz mumkin)
 APPROVAL_CHAT_ID = int(os.getenv("APPROVAL_CHAT_ID", "0") or 0)
 
+# Ruspeak sayti orqali kelgan lidlarni yozadigan alohida Google Sheet (Apps Script Web App URL)
+RUSPEAK_SHEET_URL = os.getenv("RUSPEAK_SHEET_URL", "")
+
 DB_PATH = os.getenv("DB_PATH", "bot_database.db")
 
 CARD_NUMBER = os.getenv("CARD_NUMBER", "8600 0329 4328 2921")
