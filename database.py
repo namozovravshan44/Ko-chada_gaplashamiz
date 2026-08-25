@@ -370,6 +370,16 @@ async def get_ruspeak_lead(token: str):
         return await cur.fetchone()
 
 
+async def get_ruspeak_lead_by_user_id(user_id: int):
+    async with aiosqlite.connect(DB_PATH) as db:
+        cur = await db.execute(
+            "SELECT token, user_id, username, first_name, linked_at FROM ruspeak_leads WHERE user_id=? "
+            "ORDER BY linked_at DESC LIMIT 1",
+            (user_id,),
+        )
+        return await cur.fetchone()
+
+
 # ---------- Umumiy sozlamalar (narx, matnlar va h.k. — botdan o'zgartiriladi) ----------
 
 async def get_setting(key: str, default: str = "") -> str:
