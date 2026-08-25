@@ -348,3 +348,40 @@ async def process_receipt(message: Message, state: FSMContext, bot: Bot):
 @router.message(ReceiptForm.waiting_photo)
 async def process_receipt_wrong_type(message: Message):
     await message.answer("Iltimos, to'lov chekining rasmini (screenshot) yuboring 📎")
+
+
+# ══════════════════════════════════════════════════════════════════
+# ZAXIRA (fallback) — hech qanday yuqoridagi filtrga mos kelmagan
+# signal shu yerga tushadi. Bu "sukut bilan yo'qolib ketish"ning
+# oldini oladi va nima kelganini logga yozib qo'yadi (diagnostika uchun).
+# ══════════════════════════════════════════════════════════════════
+
+@router.message()
+async def fallback_message(message: Message, state: FSMContext, bot: Bot):
+    import logging
+    current_state = await state.get_state()
+    logging.warning(
+        f"FALLBACK: hech qaysi handlerga mos kelmadi. "
+        f"user_id={message.from_user.id}, state={current_state}, "
+        f"text={message.text!r}, content_type={message.content_type}"
+    )
+    # Agar biror FSM holatida "osilib qolgan" bo'lsa — tozalab, /start'ga yo'naltiramiz
+    if current_state:
+        await state.clear()
+    lang = await db.get_user_language(message.from_user.id)
+    text = (
+        "Извините, не совсем понял 🙂 Нажмите /start, чтобы начать заново."
+        if lang == "ru"
+        else "Kechirasiz, buni tushunmadim 🙂 Qaytadan boshlash uchun /start bosing."
+    )
+    await message.answer(text)
+
+
+@router.callback_query()
+async def fallback_callback(callback: CallbackQuery):
+    import logging
+    logging.warning(
+        f"FALLBACK CALLBACK: hech qaysi handlerga mos kelmadi. "
+        f"user_id={callback.from_user.id}, data={callback.data!r}"
+    )
+    await callback.answer("Bu tugma eskirgan bo'lishi mumkin. /start bosib qayta urinib ko'ring.", show_alert=True)
