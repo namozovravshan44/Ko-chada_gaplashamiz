@@ -5,6 +5,7 @@ from aiogram.fsm.context import FSMContext
 
 import database as db
 import keyboards as kb
+import sheets_sync
 from states import LeadForm, ReceiptForm
 from config import CARD_NUMBER, CARD_OWNER, BOOK_PRICE, BOOK_DISCOUNT_PRICE, BOOK_INFO_TEXT, MANAGER_CONTACT_TEXT, APPROVAL_CHAT_ID
 
@@ -52,6 +53,13 @@ async def cmd_start_deeplink(message: Message, command: CommandObject, state: FS
 
     await db.upsert_user(user.id, user.username, user.first_name)
     await db.save_ruspeak_lead(payload, user.id, user.username or "", user.first_name or "")
+
+    lead = await db.get_ruspeak_lead(payload)
+    linked_at = lead[4] if lead else ""
+    await sheets_sync.sync_upsert_lead(
+        token=payload, username=user.username or "", user_id=user.id,
+        first_name=user.first_name or "", linked_at=linked_at,
+    )
 
     await message.answer(RUSPEAK_WELCOME_TEXT)
     await send_ruspeak_files(bot, user.id)
