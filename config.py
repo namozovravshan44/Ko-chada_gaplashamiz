@@ -23,8 +23,11 @@ BOOK_DISCOUNT_PRICE = os.getenv("BOOK_DISCOUNT_PRICE", "57 000 so'm")
 
 BOOK_INFO_TEXT = os.getenv(
     "BOOK_INFO_TEXT",
-    "📖 Kitobda 24 ta hayotiy mavzu, real suhbatlar, sifatli audio va rasmlar mavjud. "
-    "Zerikarli monolog va foydasiz mavzular yo'q — faqat kundalik hayotda kerak bo'ladigan amaliy nutq.",
+    "📖 Bu oddiy kitob emas!\n"
+    "🔥 6 ta hayotiy mavzu, real suhbatlar va kundalik hayotda kerak bo'ladigan ruscha so'zlar va iboralar.\n"
+    "❌ Zerikarli monologlar yo'q.\n"
+    "💬 Faqat jonli, amaliy va hayotda ishlatiladigan nutq!\n"
+    "📚 O'qing — va rus tilini real hayotda ishlata boshlang!",
 )
 
 MANAGER_CONTACT_TEXT = os.getenv(
